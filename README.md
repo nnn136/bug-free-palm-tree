@@ -1,4 +1,4 @@
-ФИО: Белинина Яна Сергеевна
+ФИО: Черных Елизавета Михайловна
 
 import tkinter as tk
 from tkinter import ttk, messagebox
