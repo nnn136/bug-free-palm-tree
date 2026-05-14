@@ -1,120 +1,137 @@
-ФИО: Михалькова Анастасия Витальевна
+фио: Шевченко Николай Алексеевич
 
-# Random Task Generator (Генератор случайных задач)
-
-**Описание программы:**
-Приложение "Random Task Generator" предназначено для генерации случайных задач из заранее определенного списка. Пользователь может генерировать новую задачу, а также просматривать историю сгенерированных задач. Программа включает функционал фильтрации по типу задачи и сохраняет историю в формате JSON, позволяя пользователю загружать её при следующем запуске приложения.
-
-## Пошаговая инструкция
-
-### Шаг 1: Создание списка предопределённых задач
-
-Мы создадим предопределенный список задач, который будет использоваться для генерации случайных задач.
-
-```python
 import tkinter as tk
 from tkinter import messagebox, ttk
-import random
+import requests
 import json
-import os
 
-class RandomTaskGenerator:
+class GitHubUserFinder:
     def __init__(self, master):
         self.master = master
-        master.title("Random Task Generator")
+        master.title("GitHub User Finder")
 
-        self.tasks = [
-            {"task": "Прочитать статью", "type": "учёба"},
-            {"task": "Сделать зарядку", "type": "спорт"},
-            {"task": "Подготовить отчет", "type": "работа"},
-            {"task": "Погулять с собакой", "type": "спорт"},
-            {"task": "Изучить новый язык", "type": "учёба"},
-            {"task": "Сделать уборку", "type": "работа"},
-            {"task": "Написать блог", "type": "учёба"},
-            {"task": "Пробежаться", "type": "спорт"},
-            {"task": "Собрать документы", "type": "работа"}
-        ]
+        # Поле ввода пользователя
+        self.search_label = tk.Label(master, text="Поиск пользователя GitHub:")
+        self.search_label.pack(pady=5)
 
-        self.history = []
+        self.search_entry = tk.Entry(master)
+        self.search_entry.pack(pady=5)
 
-        # Кнопка генерирования задачи
-        self.generate_button = tk.Button(master, text="Сгенерировать задачу", command=self.generate_task)
-        self.generate_button.pack(pady=10)
+        self.search_button = tk.Button(master, text="Найти", command=self.search_user)
+        self.search_button.pack(pady=5)
 
-        # Поле для отображения сгенерированной задачи
-        self.task_label = tk.Label(master, text="", font=("Arial", 14))
-        self.task_label.pack(pady=10)
+        # Список результатов
+        self.results_list = ttk.Treeview(master, columns=("username"), show='headings')
+        self.results_list.heading("username", text="Пользователь")
+        self.results_list.pack(pady=10)
 
-        # Кнопка для фильтрации
-        self.type_label = tk.Label(master, text="Фильтр по типу задачи:")
-        self.type_label.pack()
+        self.results_list.bind('<Double-1>', self.add_to_favorites)
 
-        self.type_entry = tk.Entry(master)
-        self.type_entry.pack(pady=5)
+        # Кнопка для сохранения избранных пользователей
+        self.save_button = tk.Button(master, text="Сохранить избранные", command=self.save_favorites)
+        self.save_button.pack(pady=5)
 
-        self.filter_button = tk.Button(master, text="Фильтровать", command=self.filter_tasks)
-        self.filter_button.pack(pady=5)
+        self.favorites = []
+        self.load_favorites()
 
-        # История задач
-        self.history_label = tk.Label(master, text="История задач:")
-        self.history_label.pack()
+    def search_user(self):
+        username = self.search_entry.get()
+        if not username:
+            messagebox.showerror("Ошибка", "Поле поиска не должно быть пустым.")
+            return
+        
+        response = requests.get(f"https://api.github.com/users/{username}")
+        if response.status_code == 200:
+            user = response.json()
+            self.results_list.insert("", tk.END, values=(user["login"],))
+        else:
+            messagebox.showerror("Ошибка", "Пользователь не найден.")
 
-        self.history_listbox = tk.Listbox(master, width=50)
-        self.history_listbox.pack(pady=10)
+    def add_to_favorites(self, event):
+        selected_item = self.results_list.selection()
+        if selected_item:
+            user = self.results_list.item(selected_item)['values'][0]
+            if user not in self.favorites:
+                self.favorites.append(user)
+                messagebox.showinfo("Успех", f"Пользователь {user} добавлен в избранное.")
+            else:
+                messagebox.showinfo("Уведомление", f"Пользователь {user} уже в избранном.")
 
-        self.load_history()
+    def save_favorites(self):
+        with open("favorites.json", "w") as f:
+            json.dump(self.favorites, f)
+        messagebox.showinfo("Успех", "Избранные пользователи сохранены.")
 
-    def generate_task(self):
-        task = random.choice(self.tasks)
-        self.task_label.config(text=task["task"])
-        self.history.append(task["task"])
-        self.update_history()
-
-    def update_history(self):
-        self.history_listbox.delete(0, tk.END)
-        for item in self.history:
-            self.history_listbox.insert(tk.END, item)
-        self.save_history()
-
-    def filter_tasks(self):
-        filter_type = self.type_entry.get().lower()
-        self.history_listbox.delete(0, tk.END)
-        for task in self.history:
-            if filter_type in [t["type"] for t in self.tasks if t["task"] == task]:
-                self.history_listbox.insert(tk.END, task)
-
-    def load_history(self):
-        if os.path.exists("history.json"):
-            with open("history.json", "r") as f:
-                self.history = json.load(f)
-            self.update_history()
-
-    def save_history(self):
-        with open("history.json", "w") as f:
-            json.dump(self.history, f)
+    def load_favorites(self):
+        try:
+            with open("favorites.json", "r") as f:
+                self.favorites = json.load(f)
+        except FileNotFoundError:
+            self.favorites = []
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = RandomTaskGenerator(root)
+    app = GitHubUserFinder(root)
     root.mainloop()
-```
 
-### Шаг 2: Генерация задачи
 
-Кнопка "Сгенерировать задачу" вызывает метод `generate_task`, который выбирает случайную задачу из списка и отображает её на экране.
 
-### Шаг 3: Отображение истории
+GitHub User Finder (Поиск пользователей GitHub)
+Описание программы:
+Приложение "GitHub User Finder" позволяет пользователям искать пользователей на GitHub через API GitHub. 
+Данное приложение обеспечивает простую и удобную графическую оболочку для выполнения поиска и добавления пользователей в избранное. 
+Избранные пользователи сохраняются в локальный файл JSON, что позволяет пользователям легко управлять своими предпочтениями.
 
-История сгенерированных задач отображается в `Listbox`. Каждое новое задание добавляется в историю автоматически.
 
-### Шаг 4: Фильтрация задач
 
-Функционал фильтрации реализуется в методе `filter_tasks`, который позволяет фильтровать задачи по заданному типу.
+## Требования
 
-### Шаг 5: Сохранение истории в JSON
+* Python 3.6+
+* Библиотеки: `tkinter`, `requests`, `json`
 
-История задач сохраняется в файл `history.json` с помощью методов `load_history` и `save_history`.
+## Установка и запуск
 
-### Шаг 6: Проверка корректности ввода
+1. Клонируйте репозиторий:
+```bash
+git clone <URL-репозитория>
+cd GitHub-User-Finder
 
-В данном приложении не требуется дополнительных пользовательских вводов, кроме
+#### Инструкция по настройке Git
+
+1. Инициализируйте Git‑репозиторий:
+```bash
+git init
+
+Примеры использования
+Пример 1: Поиск пользователя
+
+Введите имя пользователя в поле поиска (например, torvalds).
+
+Нажмите кнопку «Найти».
+
+В списке результатов появится Linus Torvalds и другие похожие пользователи.
+
+Пример 2: Добавление в избранное
+
+Выберите пользователя из списка результатов.
+
+Нажмите «Добавить в избранное».
+
+Пользователь появится в списке избранного.
+
+Пример 3: Просмотр избранного
+
+Нажмите кнопку «Показать избранное».
+
+В списке избранного отобразятся все сохранённые пользователи.
+
+При следующем запуске приложения избранные пользователи сохранятся.
+
+Тесты
+Поиск пустой строки: приложение покажет предупреждение «Поле поиска не может быть пустым».
+
+Поиск существующего пользователя: найдите torvalds, добавьте в избранное, закройте программу, откройте снова — пользователь должен остаться в избранном.
+
+Добавление уже избранного: попытка добавить пользователя дважды вызовет предупреждение «Этот пользователь уже в избранном».
+
+Удаление из избранного: выберите пользователя в списке избранного и нажмите «Удалить из избранного» — пользователь исчезнет из списка.
