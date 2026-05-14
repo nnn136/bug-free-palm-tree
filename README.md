@@ -1,178 +1,120 @@
-ФИО: Волкова Олеся Евгеньевна
+ФИО: Михалькова Анастасия Витальевна
 
+# Random Task Generator (Генератор случайных задач)
 
-random_quote_generator/
-├── main.py          # Основной код приложения
-├── quotes_data.json # Файл для хранения цитат и истории
-├── README.md      # Документация проекта
-└── .gitignore     # Файл игнорирования для Git
+**Описание программы:**
+Приложение "Random Task Generator" предназначено для генерации случайных задач из заранее определенного списка. Пользователь может генерировать новую задачу, а также просматривать историю сгенерированных задач. Программа включает функционал фильтрации по типу задачи и сохраняет историю в формате JSON, позволяя пользователю загружать её при следующем запуске приложения.
 
+## Пошаговая инструкция
+
+### Шаг 1: Создание списка предопределённых задач
+
+Мы создадим предопределенный список задач, который будет использоваться для генерации случайных задач.
+
+```python
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+from tkinter import messagebox, ttk
+import random
 import json
 import os
-import random
 
-class RandomQuoteGenerator:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Random Quote Generator")
-        self.history = []
-        
-        # Предопределённые цитаты
-        self.quotes = [
-            {"text": "Знание — сила", "author": "Фрэнсис Бэкон", "topic": "Мудрость"},
-            {"text": "Быть или не быть — вот в чём вопрос", "author": "Уильям Шекспир", "topic": "Философия"},
-            {"text": "Познай самого себя", "author": "Сократ", "topic": "Самопознание"},
-            {"text": "Я мыслю, следовательно, существую", "author": "Рене Декарт", "topic": "Философия"},
-            {"text": "Через тернии к звёздам", "author": "Сенека", "topic": "Мотивация"}
+class RandomTaskGenerator:
+    def __init__(self, master):
+        self.master = master
+        master.title("Random Task Generator")
+
+        self.tasks = [
+            {"task": "Прочитать статью", "type": "учёба"},
+            {"task": "Сделать зарядку", "type": "спорт"},
+            {"task": "Подготовить отчет", "type": "работа"},
+            {"task": "Погулять с собакой", "type": "спорт"},
+            {"task": "Изучить новый язык", "type": "учёба"},
+            {"task": "Сделать уборку", "type": "работа"},
+            {"task": "Написать блог", "type": "учёба"},
+            {"task": "Пробежаться", "type": "спорт"},
+            {"task": "Собрать документы", "type": "работа"}
         ]
-        
-        self.load_data()
-        self.create_widgets()
-    
-    def create_widgets(self):
-        # Кнопка генерации цитаты
-        tk.Button(self.root, text="Сгенерировать цитату", command=self.generate_quote).pack(pady=10)
-        
-        # Отображение текущей цитаты
-        self.quote_text = tk.Label(self.root, text="", wraplength=400, justify="center")
-        self.quote_text.pack(pady=5)
-        self.author_text = tk.Label(self.root, text="")
-        self.author_text.pack(pady=2)
-        self.topic_text = tk.Label(self.root, text="")
-        self.topic_text.pack(pady=2)
-        
-        # Фильтр
-        filter_frame = tk.Frame(self.root)
-        filter_frame.pack(pady=5)
-        tk.Label(filter_frame, text="Фильтр по автору:").grid(row=0, column=0)
-        self.author_filter = ttk.Combobox(filter_frame, state="readonly")
-        self.author_filter.grid(row=0, column=1, padx=5)
-        self.author_filter.bind("<<ComboboxSelected>>", self.apply_filters)
-        tk.Label(filter_frame, text="Фильтр по теме:").grid(row=1, column=0)
-        self.topic_filter = ttk.Combobox(filter_frame, state="readonly")
-        self.topic_filter.grid(row=1, column=1, padx=5)
-        self.topic_filter.bind("<<ComboboxSelected>>", self.apply_filters)
-        
-        # История
-        tk.Label(self.root, text="История цитат:").pack()
-        self.history_list = scrolledtext.ScrolledText(self.root, height=10, width=60)
-        self.history_list.pack(pady=5)
-        
-        # Кнопки управления
-        btn_frame = tk.Frame(self.root)
-        btn_frame.pack(pady=5)
-        tk.Button(btn_frame, text="Очистить историю", command=self.clear_history).pack(side="left", padx=5)
-        tk.Button(btn_frame, text="Сохранить данные", command=self.save_data).pack(side="left", padx=5)
-        
-        self.update_filters()
-    
-    def generate_quote(self):
-        author_filter = self.author_filter.get()
-        topic_filter = self.topic_filter.get()
-        filtered = self.quotes
-        if author_filter != "Все":
-            filtered = [q for q in filtered if q["author"] == author_filter]
-        if topic_filter != "Все":
-            filtered = [q for q in filtered if q["topic"] == topic_filter]
-        if not filtered:
-            messagebox.showwarning("Предупреждение", "По заданным фильтрам цитат не найдено")
-            return
-        quote = random.choice(filtered)
-        self.history.append(quote)
-        self.quote_text.config(text=f"\"{quote['text']}\"")
-        self.author_text.config(text=f"— {quote['author']}")
-        self.topic_text.config(text=f"Тема: {quote['topic']}")
-        self.update_history_display()
-    
-    def update_history_display(self):
-        self.history_list.delete(1.0, tk.END)
-        for i, quote in enumerate(self.history[-20:], 1):  # Последние 20 цитат
-            self.history_list.insert(tk.END, f"{i}. \"{quote['text']}\"\n — {quote['author']} ({quote['topic']})\n\n")
-    
-    def update_filters(self):
-        authors = sorted(set(q["author"] for q in self.quotes))
-        topics = sorted(set(q["topic"] for q in self.quotes))
-        self.author_filter["values"] = ["Все"] + authors
-        self.topic_filter["values"] = ["Все"] + topics
-        self.author_filter.set("Все")
-        self.topic_filter.set("Все")
-    
-    def apply_filters(self, event=None):
-        self.generate_quote()
-    
-    def clear_history(self):
+
         self.history = []
-        self.update_history_display()
-    
-    def save_data(self):
-        data = {
-            "quotes": self.quotes,
-            "history": self.history
-        }
-        with open("quotes_data.json", "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-        messagebox.showinfo("Успех", "Данные сохранены в quotes_data.json")
-    
-    
-    def load_data(self):
-        if os.path.exists("quotes_data.json"):
-            try:
-                with open("quotes_data.json", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                self.quotes = data.get("quotes", self.quotes)
-                self.history = data.get("history", [])
-            except Exception as e:
-                messagebox.showerror("Ошибка", f"Ошибка загрузки данных: {e}")
+
+        # Кнопка генерирования задачи
+        self.generate_button = tk.Button(master, text="Сгенерировать задачу", command=self.generate_task)
+        self.generate_button.pack(pady=10)
+
+        # Поле для отображения сгенерированной задачи
+        self.task_label = tk.Label(master, text="", font=("Arial", 14))
+        self.task_label.pack(pady=10)
+
+        # Кнопка для фильтрации
+        self.type_label = tk.Label(master, text="Фильтр по типу задачи:")
+        self.type_label.pack()
+
+        self.type_entry = tk.Entry(master)
+        self.type_entry.pack(pady=5)
+
+        self.filter_button = tk.Button(master, text="Фильтровать", command=self.filter_tasks)
+        self.filter_button.pack(pady=5)
+
+        # История задач
+        self.history_label = tk.Label(master, text="История задач:")
+        self.history_label.pack()
+
+        self.history_listbox = tk.Listbox(master, width=50)
+        self.history_listbox.pack(pady=10)
+
+        self.load_history()
+
+    def generate_task(self):
+        task = random.choice(self.tasks)
+        self.task_label.config(text=task["task"])
+        self.history.append(task["task"])
+        self.update_history()
+
+    def update_history(self):
+        self.history_listbox.delete(0, tk.END)
+        for item in self.history:
+            self.history_listbox.insert(tk.END, item)
+        self.save_history()
+
+    def filter_tasks(self):
+        filter_type = self.type_entry.get().lower()
+        self.history_listbox.delete(0, tk.END)
+        for task in self.history:
+            if filter_type in [t["type"] for t in self.tasks if t["task"] == task]:
+                self.history_listbox.insert(tk.END, task)
+
+    def load_history(self):
+        if os.path.exists("history.json"):
+            with open("history.json", "r") as f:
+                self.history = json.load(f)
+            self.update_history()
+
+    def save_history(self):
+        with open("history.json", "w") as f:
+            json.dump(self.history, f)
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = RandomQuoteGenerator(root)
+    app = RandomTaskGenerator(root)
     root.mainloop()
+```
 
-Настройка Git и публикация на GitHub
-Откройте терминал в папке проекта.
+### Шаг 2: Генерация задачи
 
-Инициализируйте Git‑репозиторий:
+Кнопка "Сгенерировать задачу" вызывает метод `generate_task`, который выбирает случайную задачу из списка и отображает её на экране.
 
-bash
-git init
-Создайте файл .gitignore со следующим содержимым:
+### Шаг 3: Отображение истории
 
-__pycache__/
-*.pyc
-Добавьте файлы в репозиторий:
+История сгенерированных задач отображается в `Listbox`. Каждое новое задание добавляется в историю автоматически.
 
-bash
-git add .
-git commit -m "Initial commit: Random Quote Generator"
-Создайте репозиторий на GitHub.
+### Шаг 4: Фильтрация задач
 
-Свяжите локальный репозиторий с удалённым:
+Функционал фильтрации реализуется в методе `filter_tasks`, который позволяет фильтровать задачи по заданному типу.
 
-bash
-git remote add origin <URL-вашего-репозитория>
-Отправьте код на GitHub:
+### Шаг 5: Сохранение истории в JSON
 
-bash
-git push -u origin main
+История задач сохраняется в файл `history.json` с помощью методов `load_history` и `save_history`.
 
-Создание README.md
-Создайте файл README.md со следующим содержанием:
+### Шаг 6: Проверка корректности ввода
 
-
-## Описание
-
-Random Quote Generator — это простое GUI‑приложение на Python, которое генерирует случайные цитаты из предопределённого списка. Приложение позволяет:
-* генерировать случайные цитаты;
-* просматривать историю сгенерированных цитат;
-* фильтровать цитаты по автору и теме;
-* сохранять и загружать историю и цитаты в формате JSON.
-
-## Функциональность
-
-* **Кнопка «Сгенерировать цитату»** — выбирает случайную цитату из списка (с учётом фильтров).
-* **История цитат** — отображает последние 20 сгенерированных цитат.
-* **Фильтры** — позволяют фильтровать цитаты по автору и теме.
-* **Сохранение данных** — сохраняет цитаты и
+В данном приложении не требуется дополнительных пользовательских вводов, кроме
