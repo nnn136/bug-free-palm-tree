@@ -1,203 +1,127 @@
-ФИО: Каньшина Мария Сергеевна
+ФИО: Попова Марина Александровна
+
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox, ttk
 import json
-import random
-import string
-import os
 
-class PasswordGenerator:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Random Password Generator")
-        self.root.geometry("600x500")
+class BookTracker:
+    def __init__(self, master):
+        self.master = master
+        master.title("Book Tracker")
 
-        # Переменная для длины пароля
-        self.length = tk.IntVar(value=12)
-        # Переменные для выбора символов
-        self.use_digits = tk.BooleanVar(value=True)
-        self.use_letters = tk.BooleanVar(value=True)
-        self.use_special = tk.BooleanVar(value=False)
+        self.title_label = tk.Label(master, text="Название книги:")
+        self.title_label.pack()
+        
+        self.title_entry = tk.Entry(master)
+        self.title_entry.pack()
 
-        self.history = []
-        self.load_history()
+        self.author_label = tk.Label(master, text="Автор:")
+        self.author_label.pack()
 
-        self.create_widgets()
+        self.author_entry = tk.Entry(master)
+        self.author_entry.pack()
 
-    def create_widgets(self):
-        # Ползунок длины пароля
-        ttk.Label(self.root, text="Длина пароля:").pack(pady=5)
-        length_slider = ttk.Scale(
-            self.root,
-            from_=4,
-            to=32,
-            orient="horizontal",
-            variable=self.length
-        )
-        length_slider.pack(pady=5, fill="x", padx=20)
+        self.genre_label = tk.Label(master, text="Жанр:")
+        self.genre_label.pack()
 
-        length_label = ttk.Label(self.root, textvariable=self.length)
-        length_label.pack()
+        self.genre_entry = tk.Entry(master)
+        self.genre_entry.pack()
+        
+        self.pages_label = tk.Label(master, text="Количество страниц:")
+        self.pages_label.pack()
 
-        # Чекбоксы для выбора символов
-        ttk.Checkbutton(
-            self.root,
-            text="Цифры (0-9)",
-            variable=self.use_digits
-        ).pack(anchor="w", padx=20)
-        ttk.Checkbutton(
-            self.root,
-            text="Буквы (A-Z, a-z)",
-            variable=self.use_letters
-        ).pack(anchor="w", padx=20)
-        ttk.Checkbutton(
-            self.root,
-            text="Спецсимволы (!@#$%)",
-            variable=self.use_special
-        ).pack(anchor="w", padx=20)
+        self.pages_entry = tk.Entry(master)
+        self.pages_entry.pack()
 
-        # Кнопка генерации
-        generate_btn = ttk.Button(
-            self.root,
-            text="Сгенерировать пароль",
-            command=self.generate_password
-        )
-        generate_btn.pack(pady=10)
+        self.add_button = tk.Button(master, text="Добавить книгу", command=self.add_book)
+        self.add_button.pack()
 
-        # Поле отображения пароля
-        self.password_var = tk.StringVar()
-        password_entry = ttk.Entry(
-            self.root,
-            textvariable=self.password_var,
-            state="readonly",
-            font=("Courier", 12)
-        )
-        password_entry.pack(fill="x", padx=20, pady=5)
+        self.filter_label = tk.Label(master, text="Фильтр по жанру:")
+        self.filter_label.pack()
 
-        # Таблица истории
-        columns = ("ID", "Пароль", "Длина", "Символы")
-        self.tree = ttk.Treeview(self.root, columns=columns, show="headings")
+        self.filter_entry = tk.Entry(master)
+        self.filter_entry.pack()
 
-        for col in columns:
-            self.tree.heading(col, text=col)
-            self.tree.column(col, width=100)
+        self.filter_button = tk.Button(master, text="Фильтровать", command=self.filter_books)
+        self.filter_button.pack()
+        
+        self.books_list = ttk.Treeview(master, columns=("title", "author", "genre", "pages"), show='headings')
+        self.books_list.heading("title", text="Название книги")
+        self.books_list.heading("author", text="Автор")
+        self.books_list.heading("genre", text="Жанр")
+        self.books_list.heading("pages", text="Количество страниц")
+        self.books_list.pack()
 
-        self.tree.pack(fill="both", expand=True, padx=20, pady=10)
+        self.books = []
+        self.load_books()
 
-        # Кнопка очистки истории
-        clear_btn = ttk.Button(
-            self.root,
-            text="Очистить историю",
-            command=self.clear_history
-        )
-        clear_btn.pack(pady=5)
-    def generate_password(self):
-        # Проверка корректности ввода
-        if not self.validate_input():
+    def add_book(self):
+        title = self.title_entry.get()
+        author = self.author_entry.get()
+        genre = self.genre_entry.get()
+        pages_str = self.pages_entry.get()
+        
+        if not title or not author or not genre or not pages_str:
+            messagebox.showerror("Ошибка", "Все поля должны быть заполнены.")
+            return
+        
+        try:
+            pages = int(pages_str)
+        except ValueError:
+            messagebox.showerror("Ошибка", "Количество страниц должно быть числом.")
             return
 
-        # Формирование пула символов
-        chars = ""
-        if self.use_digits.get():
-            chars += string.digits
-        if self.use_letters.get():
-            chars += string.ascii_letters
-        if self.use_special.get():
-            chars += "!@#$%^&*"
-
-        if not chars:
-            messagebox.showerror("Ошибка", "Выберите хотя бы один тип символов!")
-            return
-
-        # Генерация пароля
-        password = ''.join(random.choice(chars) for _ in range(self.length.get()))
-        self.password_var.set(password)
-
-        # Добавление в историю
-        self.add_to_history(password)
-    def load_history(self):
-        try:
-            if os.path.exists("password_history.json"):
-                with open("password_history.json", "r", encoding="utf-8") as f:
-                    self.history = json.load(f)
-                self.update_history_table()
-        except Exception as e:
-            print(f"Ошибка загрузки истории: {e}")
-
-    def save_history(self):
-        try:
-            with open("password_history.json", "w", encoding="utf-8") as f:
-                json.dump(self.history, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"Ошибка сохранения истории: {e}")
-
-    def add_to_history(self, password):
-        entry = {
-            "id": len(self.history) + 1,
-            "password": password,
-            "length": self.length.get(),
-            "characters": self.get_char_types()
+        book = {
+            "title": title,
+            "author": author,
+            "genre": genre,
+            "pages": pages
         }
-        self.history.append(entry)
-        self.save_history()
-        self.update_history_table()
+        self.books.append(book)
+        self.books_list.insert("", tk.END, values=(title, author, genre, pages))
+        self.save_books()
 
-    def update_history_table(self):
-        # Очистка таблицы
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+    def filter_books(self):
+        genre_filter = self.filter_entry.get().lower()
+        for item in self.books_list.get_children():
+            self.books_list.delete(item)
+        
+        for book in self.books:
+            if genre_filter in book["genre"].lower():
+                self.books_list.insert("", tk.END, values=(book["title"], book["author"], book["genre"], book["pages"]))
+    
+    def load_books(self):
+        try:
+            with open("books.json", "r") as f:
+                self.books = json.load(f)
+                for book in self.books:
+                    self.books_list.insert("", tk.END, values=(book["title"], book["author"], book["genre"], book["pages"]))
+        except FileNotFoundError:
+            self.books = []
 
-        # Заполнение таблицы
-        for entry in self.history[-50:]:  # Последние 50 записей
-            self.tree.insert("", "end", values=(
-                entry["id"],
-                entry["password"],
-                entry["length"],
-                entry["characters"]
-            ))
+    def save_books(self):
+        with open("books.json", "w") as f:
+            json.dump(self.books, f)
 
-    def clear_history(self):
-        self.history = []
-        self.save_history()
-        self.update_history_table()
-    def validate_input(self):
-        length = self.length.get()
-        if length < 4:
-            messagebox.showerror("Ошибка", "Минимальная длина пароля — 4 символа!")
-            return False
-        if length > 32:
-            messagebox.showerror("Ошибка", "Максимальная длина пароля — 32 символа!")
-            return False
-        return True
-
-    def get_char_types(self):
-        types = []
-        if self.use_digits.get(): types.append("Цифры")
-        if self.use_letters.get(): types.append("Буквы")
-        if self.use_special.get(): types.append("Спецсимволы")
-        return ", ".join(types)
 if __name__ == "__main__":
     root = tk.Tk()
-    app = PasswordGenerator(root)
+    app = BookTracker(root)
     root.mainloop()
 
-Random Password Generator — приложение для генерации безопасных паролей с настраиваемыми параметрами и сохранением истории.
+Описание программы:
+Программа "Book Tracker" предназначена для управления списком прочитанных книг. 
+С её помощью пользователи могут добавлять информацию о книгах, включая название, автора, жанр и количество страниц. 
+Также реализована возможность фильтрации по жанру и количеству страниц. 
+Все данные хранятся в формате JSON, что позволяет их легко сохранять и загружать. 
+Приложение имеет интуитивно понятный графический интерфейс, который упрощает взаимодействие с пользователем.
 
-Возможности: настройка длины пароля (4–32 символа);
+Шаг 1: Создание интерфейса
+Для создания графического интерфейса можно использовать библиотеку Tkinter. 
+Шаг 2: Добавление книги
+Кнопка "Добавить книгу" реализована в методе add_book(), который проверяет вводимые данные и добавляет новую книгу в список и таблицу.
 
-выбор типов символов (цифры, буквы, спецсимволы);
+Шаг 3: Фильтрация
+Функция для фильтрации по жанру реализована в методе filter_books(), который очищает список книг и отображает только те, которые соответствуют введенному жанру.
 
-генерация случайных паролей;
-
-сохранение истории последних 50 паролей;
-
-экспорт истории в JSON;
-
-интуитивно понятный интерфейс.
-
-Примеры использования: Генерация простого пароля (12 символов, только цифры и буквы).
-
-Создание сложного пароля (20 символов, с спецсимволами).
-
-Просмотр истории и копирование ранее сгенерированных паролей
+Шаг 4: Сохранение и загрузка в JSON
