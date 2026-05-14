@@ -1,178 +1,136 @@
-ФИО: Лебедева Софья Александровна
-
-
-random_quote_generator/
-├── main.py          # Основной код приложения
-├── quotes_data.json # Файл для хранения цитат и истории
-├── README.md      # Документация проекта
-└── .gitignore     # Файл игнорирования для Git
+фио: Хакназарова Шахзода Саидназаровна
 
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+from tkinter import messagebox, ttk
+import requests
 import json
-import os
-import random
 
-class RandomQuoteGenerator:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Random Quote Generator")
-        self.history = []
-        
-        # Предопределённые цитаты
-        self.quotes = [
-            {"text": "Знание — сила", "author": "Фрэнсис Бэкон", "topic": "Мудрость"},
-            {"text": "Быть или не быть — вот в чём вопрос", "author": "Уильям Шекспир", "topic": "Философия"},
-            {"text": "Познай самого себя", "author": "Сократ", "topic": "Самопознание"},
-            {"text": "Я мыслю, следовательно, существую", "author": "Рене Декарт", "topic": "Философия"},
-            {"text": "Через тернии к звёздам", "author": "Сенека", "topic": "Мотивация"}
-        ]
-        
-        self.load_data()
-        self.create_widgets()
-    
-    def create_widgets(self):
-        # Кнопка генерации цитаты
-        tk.Button(self.root, text="Сгенерировать цитату", command=self.generate_quote).pack(pady=10)
-        
-        # Отображение текущей цитаты
-        self.quote_text = tk.Label(self.root, text="", wraplength=400, justify="center")
-        self.quote_text.pack(pady=5)
-        self.author_text = tk.Label(self.root, text="")
-        self.author_text.pack(pady=2)
-        self.topic_text = tk.Label(self.root, text="")
-        self.topic_text.pack(pady=2)
-        
-        # Фильтр
-        filter_frame = tk.Frame(self.root)
-        filter_frame.pack(pady=5)
-        tk.Label(filter_frame, text="Фильтр по автору:").grid(row=0, column=0)
-        self.author_filter = ttk.Combobox(filter_frame, state="readonly")
-        self.author_filter.grid(row=0, column=1, padx=5)
-        self.author_filter.bind("<<ComboboxSelected>>", self.apply_filters)
-        tk.Label(filter_frame, text="Фильтр по теме:").grid(row=1, column=0)
-        self.topic_filter = ttk.Combobox(filter_frame, state="readonly")
-        self.topic_filter.grid(row=1, column=1, padx=5)
-        self.topic_filter.bind("<<ComboboxSelected>>", self.apply_filters)
-        
-        # История
-        tk.Label(self.root, text="История цитат:").pack()
-        self.history_list = scrolledtext.ScrolledText(self.root, height=10, width=60)
-        self.history_list.pack(pady=5)
-        
-        # Кнопки управления
-        btn_frame = tk.Frame(self.root)
-        btn_frame.pack(pady=5)
-        tk.Button(btn_frame, text="Очистить историю", command=self.clear_history).pack(side="left", padx=5)
-        tk.Button(btn_frame, text="Сохранить данные", command=self.save_data).pack(side="left", padx=5)
-        
-        self.update_filters()
-    
-    def generate_quote(self):
-        author_filter = self.author_filter.get()
-        topic_filter = self.topic_filter.get()
-        filtered = self.quotes
-        if author_filter != "Все":
-            filtered = [q for q in filtered if q["author"] == author_filter]
-        if topic_filter != "Все":
-            filtered = [q for q in filtered if q["topic"] == topic_filter]
-        if not filtered:
-            messagebox.showwarning("Предупреждение", "По заданным фильтрам цитат не найдено")
+class GitHubUserFinder:
+    def __init__(self, master):
+        self.master = master
+        master.title("GitHub User Finder")
+
+        # Поле ввода пользователя
+        self.search_label = tk.Label(master, text="Поиск пользователя GitHub:")
+        self.search_label.pack(pady=5)
+
+        self.search_entry = tk.Entry(master)
+        self.search_entry.pack(pady=5)
+
+        self.search_button = tk.Button(master, text="Найти", command=self.search_user)
+        self.search_button.pack(pady=5)
+
+        # Список результатов
+        self.results_list = ttk.Treeview(master, columns=("username"), show='headings')
+        self.results_list.heading("username", text="Пользователь")
+        self.results_list.pack(pady=10)
+
+        self.results_list.bind('<Double-1>', self.add_to_favorites)
+
+        # Кнопка для сохранения избранных пользователей
+        self.save_button = tk.Button(master, text="Сохранить избранные", command=self.save_favorites)
+        self.save_button.pack(pady=5)
+
+        self.favorites = []
+        self.load_favorites()
+
+    def search_user(self):
+        username = self.search_entry.get()
+        if not username:
+            messagebox.showerror("Ошибка", "Поле поиска не должно быть пустым.")
             return
-        quote = random.choice(filtered)
-        self.history.append(quote)
-        self.quote_text.config(text=f"\"{quote['text']}\"")
-        self.author_text.config(text=f"— {quote['author']}")
-        self.topic_text.config(text=f"Тема: {quote['topic']}")
-        self.update_history_display()
-    
-    def update_history_display(self):
-        self.history_list.delete(1.0, tk.END)
-        for i, quote in enumerate(self.history[-20:], 1):  # Последние 20 цитат
-            self.history_list.insert(tk.END, f"{i}. \"{quote['text']}\"\n — {quote['author']} ({quote['topic']})\n\n")
-    
-    def update_filters(self):
-        authors = sorted(set(q["author"] for q in self.quotes))
-        topics = sorted(set(q["topic"] for q in self.quotes))
-        self.author_filter["values"] = ["Все"] + authors
-        self.topic_filter["values"] = ["Все"] + topics
-        self.author_filter.set("Все")
-        self.topic_filter.set("Все")
-    
-    def apply_filters(self, event=None):
-        self.generate_quote()
-    
-    def clear_history(self):
-        self.history = []
-        self.update_history_display()
-    
-    def save_data(self):
-        data = {
-            "quotes": self.quotes,
-            "history": self.history
-        }
-        with open("quotes_data.json", "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-        messagebox.showinfo("Успех", "Данные сохранены в quotes_data.json")
-    
-    
-    def load_data(self):
-        if os.path.exists("quotes_data.json"):
-            try:
-                with open("quotes_data.json", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                self.quotes = data.get("quotes", self.quotes)
-                self.history = data.get("history", [])
-            except Exception as e:
-                messagebox.showerror("Ошибка", f"Ошибка загрузки данных: {e}")
+        
+        response = requests.get(f"https://api.github.com/users/{username}")
+        if response.status_code == 200:
+            user = response.json()
+            self.results_list.insert("", tk.END, values=(user["login"],))
+        else:
+            messagebox.showerror("Ошибка", "Пользователь не найден.")
+
+    def add_to_favorites(self, event):
+        selected_item = self.results_list.selection()
+        if selected_item:
+            user = self.results_list.item(selected_item)['values'][0]
+            if user not in self.favorites:
+                self.favorites.append(user)
+                messagebox.showinfo("Успех", f"Пользователь {user} добавлен в избранное.")
+            else:
+                messagebox.showinfo("Уведомление", f"Пользователь {user} уже в избранном.")
+
+    def save_favorites(self):
+        with open("favorites.json", "w") as f:
+            json.dump(self.favorites, f)
+        messagebox.showinfo("Успех", "Избранные пользователи сохранены.")
+
+    def load_favorites(self):
+        try:
+            with open("favorites.json", "r") as f:
+                self.favorites = json.load(f)
+        except FileNotFoundError:
+            self.favorites = []
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = RandomQuoteGenerator(root)
+    app = GitHubUserFinder(root)
     root.mainloop()
 
-Настройка Git и публикация на GitHub
-Откройте терминал в папке проекта.
 
-Инициализируйте Git‑репозиторий:
+GitHub User Finder (Поиск пользователей GitHub)
+Описание программы:
+Приложение "GitHub User Finder" позволяет пользователям искать пользователей на GitHub через API GitHub. 
+Данное приложение обеспечивает простую и удобную графическую оболочку для выполнения поиска и добавления пользователей в избранное. 
+Избранные пользователи сохраняются в локальный файл JSON, что позволяет пользователям легко управлять своими предпочтениями.
 
-bash
+
+
+## Требования
+
+* Python 3.6+
+* Библиотеки: `tkinter`, `requests`, `json`
+
+## Установка и запуск
+
+1. Клонируйте репозиторий:
+```bash
+git clone <URL-репозитория>
+cd GitHub-User-Finder
+
+#### Инструкция по настройке Git
+
+1. Инициализируйте Git‑репозиторий:
+```bash
 git init
-Создайте файл .gitignore со следующим содержимым:
 
-__pycache__/
-*.pyc
-Добавьте файлы в репозиторий:
+Примеры использования
+Пример 1: Поиск пользователя
 
-bash
-git add .
-git commit -m "Initial commit: Random Quote Generator"
-Создайте репозиторий на GitHub.
+Введите имя пользователя в поле поиска (например, torvalds).
 
-Свяжите локальный репозиторий с удалённым:
+Нажмите кнопку «Найти».
 
-bash
-git remote add origin <URL-вашего-репозитория>
-Отправьте код на GitHub:
+В списке результатов появится Linus Torvalds и другие похожие пользователи.
 
-bash
-git push -u origin main
+Пример 2: Добавление в избранное
 
-Создание README.md
-Создайте файл README.md со следующим содержанием:
+Выберите пользователя из списка результатов.
 
+Нажмите «Добавить в избранное».
 
-## Описание
+Пользователь появится в списке избранного.
 
-Random Quote Generator — это простое GUI‑приложение на Python, которое генерирует случайные цитаты из предопределённого списка. Приложение позволяет:
-* генерировать случайные цитаты;
-* просматривать историю сгенерированных цитат;
-* фильтровать цитаты по автору и теме;
-* сохранять и загружать историю и цитаты в формате JSON.
+Пример 3: Просмотр избранного
 
-## Функциональность
+Нажмите кнопку «Показать избранное».
 
-* **Кнопка «Сгенерировать цитату»** — выбирает случайную цитату из списка (с учётом фильтров).
-* **История цитат** — отображает последние 20 сгенерированных цитат.
-* **Фильтры** — позволяют фильтровать цитаты по автору и теме.
-* **Сохранение данных** — сохраняет цитаты и
+В списке избранного отобразятся все сохранённые пользователи.
+
+При следующем запуске приложения избранные пользователи сохранятся.
+
+Тесты
+Поиск пустой строки: приложение покажет предупреждение «Поле поиска не может быть пустым».
+
+Поиск существующего пользователя: найдите torvalds, добавьте в избранное, закройте программу, откройте снова — пользователь должен остаться в избранном.
+
+Добавление уже избранного: попытка добавить пользователя дважды вызовет предупреждение «Этот пользователь уже в избранном».
+
+Удаление из избранного: выберите пользователя в списке избранного и нажмите «Удалить из избранного» — пользователь исчезнет из списка.
