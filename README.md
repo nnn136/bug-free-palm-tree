@@ -1,126 +1,178 @@
-ФИО: Квашин Владимир Александрович
+ФИО: Лебедева Софья Александровна
+
+
+random_quote_generator/
+├── main.py          # Основной код приложения
+├── quotes_data.json # Файл для хранения цитат и истории
+├── README.md      # Документация проекта
+└── .gitignore     # Файл игнорирования для Git
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk, messagebox, scrolledtext
 import json
+import os
+import random
 
-class BookTracker:
-    def __init__(self, master):
-        self.master = master
-        master.title("Book Tracker")
-
-        self.title_label = tk.Label(master, text="Название книги:")
-        self.title_label.pack()
+class RandomQuoteGenerator:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Random Quote Generator")
+        self.history = []
         
-        self.title_entry = tk.Entry(master)
-        self.title_entry.pack()
-
-        self.author_label = tk.Label(master, text="Автор:")
-        self.author_label.pack()
-
-        self.author_entry = tk.Entry(master)
-        self.author_entry.pack()
-
-        self.genre_label = tk.Label(master, text="Жанр:")
-        self.genre_label.pack()
-
-        self.genre_entry = tk.Entry(master)
-        self.genre_entry.pack()
+        # Предопределённые цитаты
+        self.quotes = [
+            {"text": "Знание — сила", "author": "Фрэнсис Бэкон", "topic": "Мудрость"},
+            {"text": "Быть или не быть — вот в чём вопрос", "author": "Уильям Шекспир", "topic": "Философия"},
+            {"text": "Познай самого себя", "author": "Сократ", "topic": "Самопознание"},
+            {"text": "Я мыслю, следовательно, существую", "author": "Рене Декарт", "topic": "Философия"},
+            {"text": "Через тернии к звёздам", "author": "Сенека", "topic": "Мотивация"}
+        ]
         
-        self.pages_label = tk.Label(master, text="Количество страниц:")
-        self.pages_label.pack()
-
-        self.pages_entry = tk.Entry(master)
-        self.pages_entry.pack()
-
-        self.add_button = tk.Button(master, text="Добавить книгу", command=self.add_book)
-        self.add_button.pack()
-
-        self.filter_label = tk.Label(master, text="Фильтр по жанру:")
-        self.filter_label.pack()
-
-        self.filter_entry = tk.Entry(master)
-        self.filter_entry.pack()
-
-        self.filter_button = tk.Button(master, text="Фильтровать", command=self.filter_books)
-        self.filter_button.pack()
-        
-        self.books_list = ttk.Treeview(master, columns=("title", "author", "genre", "pages"), show='headings')
-        self.books_list.heading("title", text="Название книги")
-        self.books_list.heading("author", text="Автор")
-        self.books_list.heading("genre", text="Жанр")
-        self.books_list.heading("pages", text="Количество страниц")
-        self.books_list.pack()
-
-        self.books = []
-        self.load_books()
-
-    def add_book(self):
-        title = self.title_entry.get()
-        author = self.author_entry.get()
-        genre = self.genre_entry.get()
-        pages_str = self.pages_entry.get()
-        
-        if not title or not author or not genre or not pages_str:
-            messagebox.showerror("Ошибка", "Все поля должны быть заполнены.")
-            return
-        
-        try:
-            pages = int(pages_str)
-        except ValueError:
-            messagebox.showerror("Ошибка", "Количество страниц должно быть числом.")
-            return
-
-        book = {
-            "title": title,
-            "author": author,
-            "genre": genre,
-            "pages": pages
-        }
-        self.books.append(book)
-        self.books_list.insert("", tk.END, values=(title, author, genre, pages))
-        self.save_books()
-
-    def filter_books(self):
-        genre_filter = self.filter_entry.get().lower()
-        for item in self.books_list.get_children():
-            self.books_list.delete(item)
-        
-        for book in self.books:
-            if genre_filter in book["genre"].lower():
-                self.books_list.insert("", tk.END, values=(book["title"], book["author"], book["genre"], book["pages"]))
+        self.load_data()
+        self.create_widgets()
     
-    def load_books(self):
-        try:
-            with open("books.json", "r") as f:
-                self.books = json.load(f)
-                for book in self.books:
-                    self.books_list.insert("", tk.END, values=(book["title"], book["author"], book["genre"], book["pages"]))
-        except FileNotFoundError:
-            self.books = []
-
-    def save_books(self):
-        with open("books.json", "w") as f:
-            json.dump(self.books, f)
+    def create_widgets(self):
+        # Кнопка генерации цитаты
+        tk.Button(self.root, text="Сгенерировать цитату", command=self.generate_quote).pack(pady=10)
+        
+        # Отображение текущей цитаты
+        self.quote_text = tk.Label(self.root, text="", wraplength=400, justify="center")
+        self.quote_text.pack(pady=5)
+        self.author_text = tk.Label(self.root, text="")
+        self.author_text.pack(pady=2)
+        self.topic_text = tk.Label(self.root, text="")
+        self.topic_text.pack(pady=2)
+        
+        # Фильтр
+        filter_frame = tk.Frame(self.root)
+        filter_frame.pack(pady=5)
+        tk.Label(filter_frame, text="Фильтр по автору:").grid(row=0, column=0)
+        self.author_filter = ttk.Combobox(filter_frame, state="readonly")
+        self.author_filter.grid(row=0, column=1, padx=5)
+        self.author_filter.bind("<<ComboboxSelected>>", self.apply_filters)
+        tk.Label(filter_frame, text="Фильтр по теме:").grid(row=1, column=0)
+        self.topic_filter = ttk.Combobox(filter_frame, state="readonly")
+        self.topic_filter.grid(row=1, column=1, padx=5)
+        self.topic_filter.bind("<<ComboboxSelected>>", self.apply_filters)
+        
+        # История
+        tk.Label(self.root, text="История цитат:").pack()
+        self.history_list = scrolledtext.ScrolledText(self.root, height=10, width=60)
+        self.history_list.pack(pady=5)
+        
+        # Кнопки управления
+        btn_frame = tk.Frame(self.root)
+        btn_frame.pack(pady=5)
+        tk.Button(btn_frame, text="Очистить историю", command=self.clear_history).pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Сохранить данные", command=self.save_data).pack(side="left", padx=5)
+        
+        self.update_filters()
+    
+    def generate_quote(self):
+        author_filter = self.author_filter.get()
+        topic_filter = self.topic_filter.get()
+        filtered = self.quotes
+        if author_filter != "Все":
+            filtered = [q for q in filtered if q["author"] == author_filter]
+        if topic_filter != "Все":
+            filtered = [q for q in filtered if q["topic"] == topic_filter]
+        if not filtered:
+            messagebox.showwarning("Предупреждение", "По заданным фильтрам цитат не найдено")
+            return
+        quote = random.choice(filtered)
+        self.history.append(quote)
+        self.quote_text.config(text=f"\"{quote['text']}\"")
+        self.author_text.config(text=f"— {quote['author']}")
+        self.topic_text.config(text=f"Тема: {quote['topic']}")
+        self.update_history_display()
+    
+    def update_history_display(self):
+        self.history_list.delete(1.0, tk.END)
+        for i, quote in enumerate(self.history[-20:], 1):  # Последние 20 цитат
+            self.history_list.insert(tk.END, f"{i}. \"{quote['text']}\"\n — {quote['author']} ({quote['topic']})\n\n")
+    
+    def update_filters(self):
+        authors = sorted(set(q["author"] for q in self.quotes))
+        topics = sorted(set(q["topic"] for q in self.quotes))
+        self.author_filter["values"] = ["Все"] + authors
+        self.topic_filter["values"] = ["Все"] + topics
+        self.author_filter.set("Все")
+        self.topic_filter.set("Все")
+    
+    def apply_filters(self, event=None):
+        self.generate_quote()
+    
+    def clear_history(self):
+        self.history = []
+        self.update_history_display()
+    
+    def save_data(self):
+        data = {
+            "quotes": self.quotes,
+            "history": self.history
+        }
+        with open("quotes_data.json", "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        messagebox.showinfo("Успех", "Данные сохранены в quotes_data.json")
+    
+    
+    def load_data(self):
+        if os.path.exists("quotes_data.json"):
+            try:
+                with open("quotes_data.json", "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self.quotes = data.get("quotes", self.quotes)
+                self.history = data.get("history", [])
+            except Exception as e:
+                messagebox.showerror("Ошибка", f"Ошибка загрузки данных: {e}")
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = BookTracker(root)
+    app = RandomQuoteGenerator(root)
     root.mainloop()
 
-Описание программы:
-Программа "Book Tracker" предназначена для управления списком прочитанных книг. 
-С её помощью пользователи могут добавлять информацию о книгах, включая название, автора, жанр и количество страниц. 
-Также реализована возможность фильтрации по жанру и количеству страниц. 
-Все данные хранятся в формате JSON, что позволяет их легко сохранять и загружать. 
-Приложение имеет интуитивно понятный графический интерфейс, который упрощает взаимодействие с пользователем.
+Настройка Git и публикация на GitHub
+Откройте терминал в папке проекта.
 
-Шаг 1: Создание интерфейса
-Для создания графического интерфейса можно использовать библиотеку Tkinter. 
-Шаг 2: Добавление книги
-Кнопка "Добавить книгу" реализована в методе add_book(), который проверяет вводимые данные и добавляет новую книгу в список и таблицу.
+Инициализируйте Git‑репозиторий:
 
-Шаг 3: Фильтрация
-Функция для фильтрации по жанру реализована в методе filter_books(), который очищает список книг и отображает только те, которые соответствуют введенному жанру.
+bash
+git init
+Создайте файл .gitignore со следующим содержимым:
 
-Шаг 4: Сохранение и загрузка в JSON
+__pycache__/
+*.pyc
+Добавьте файлы в репозиторий:
+
+bash
+git add .
+git commit -m "Initial commit: Random Quote Generator"
+Создайте репозиторий на GitHub.
+
+Свяжите локальный репозиторий с удалённым:
+
+bash
+git remote add origin <URL-вашего-репозитория>
+Отправьте код на GitHub:
+
+bash
+git push -u origin main
+
+Создание README.md
+Создайте файл README.md со следующим содержанием:
+
+
+## Описание
+
+Random Quote Generator — это простое GUI‑приложение на Python, которое генерирует случайные цитаты из предопределённого списка. Приложение позволяет:
+* генерировать случайные цитаты;
+* просматривать историю сгенерированных цитат;
+* фильтровать цитаты по автору и теме;
+* сохранять и загружать историю и цитаты в формате JSON.
+
+## Функциональность
+
+* **Кнопка «Сгенерировать цитату»** — выбирает случайную цитату из списка (с учётом фильтров).
+* **История цитат** — отображает последние 20 сгенерированных цитат.
+* **Фильтры** — позволяют фильтровать цитаты по автору и теме.
+* **Сохранение данных** — сохраняет цитаты и
