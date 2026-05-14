@@ -1,4 +1,4 @@
-фио: Шевченко Николай Алексеевич
+фио: Заяц Никита Станиславович
 
 import tkinter as tk
 from tkinter import messagebox, ttk
