@@ -1,137 +1,128 @@
-фио: Заяц Никита Станиславович
+ФИО:  Васелевская Алина Даниловна
 
+
+# Training Planner (План тренировок)
+
+**Описание программы:**
+Приложение "Training Planner" предназначено для планирования тренировок, позволяет пользователям добавлять записи о тренировках, фильтровать их по типу и дате, а также сохранять и загружать данные в формате JSON. Приложение имеет интуитивно понятный интерфейс, что позволяет легко управлять записями о тренировках.
+
+## Пошаговая инструкция
+
+### Шаг 1: Создание интерфейса
+
+Для создания графического интерфейса мы можем использовать библиотеку Tkinter. Пример кода для реализации интерфейса:
+
+```python
 import tkinter as tk
 from tkinter import messagebox, ttk
-import requests
 import json
+import os
+from datetime import datetime
 
-class GitHubUserFinder:
+class TrainingPlanner:
     def __init__(self, master):
         self.master = master
-        master.title("GitHub User Finder")
+        master.title("Training Planner")
 
-        # Поле ввода пользователя
-        self.search_label = tk.Label(master, text="Поиск пользователя GitHub:")
-        self.search_label.pack(pady=5)
+        # Поля ввода
+        self.date_label = tk.Label(master, text="Дата (гггг-мм-дд):")
+        self.date_label.pack()
 
-        self.search_entry = tk.Entry(master)
-        self.search_entry.pack(pady=5)
+        self.date_entry = tk.Entry(master)
+        self.date_entry.pack()
 
-        self.search_button = tk.Button(master, text="Найти", command=self.search_user)
-        self.search_button.pack(pady=5)
+        self.type_label = tk.Label(master, text="Тип тренировки:")
+        self.type_label.pack()
 
-        # Список результатов
-        self.results_list = ttk.Treeview(master, columns=("username"), show='headings')
-        self.results_list.heading("username", text="Пользователь")
-        self.results_list.pack(pady=10)
+        self.type_entry = tk.Entry(master)
+        self.type_entry.pack()
 
-        self.results_list.bind('<Double-1>', self.add_to_favorites)
+        self.duration_label = tk.Label(master, text="Длительность (минуты):")
+        self.duration_label.pack()
 
-        # Кнопка для сохранения избранных пользователей
-        self.save_button = tk.Button(master, text="Сохранить избранные", command=self.save_favorites)
-        self.save_button.pack(pady=5)
+        self.duration_entry = tk.Entry(master)
+        self.duration_entry.pack()
 
-        self.favorites = []
-        self.load_favorites()
+        self.add_button = tk.Button(master, text="Добавить тренировку", command=self.add_training)
+        self.add_button.pack(pady=5)
 
-    def search_user(self):
-        username = self.search_entry.get()
-        if not username:
-            messagebox.showerror("Ошибка", "Поле поиска не должно быть пустым.")
-            return
-        
-        response = requests.get(f"https://api.github.com/users/{username}")
-        if response.status_code == 200:
-            user = response.json()
-            self.results_list.insert("", tk.END, values=(user["login"],))
-        else:
-            messagebox.showerror("Ошибка", "Пользователь не найден.")
+        # Таблица для отображения тренировок
+        self.trainings_list = ttk.Treeview(master, columns=("date", "type", "duration"), show='headings')
+        self.trainings_list.heading("date", text="Дата")
+        self.trainings_list.heading("type", text="Тип тренировки")
+        self.trainings_list.heading("duration", text="Длительность (мин)")
+        self.trainings_list.pack(pady=10)
 
-    def add_to_favorites(self, event):
-        selected_item = self.results_list.selection()
-        if selected_item:
-            user = self.results_list.item(selected_item)['values'][0]
-            if user not in self.favorites:
-                self.favorites.append(user)
-                messagebox.showinfo("Успех", f"Пользователь {user} добавлен в избранное.")
-            else:
-                messagebox.showinfo("Уведомление", f"Пользователь {user} уже в избранном.")
+        # Поле для фильтрации
+        self.filter_label = tk.Label(master, text="Фильтр по типу тренировки:")
+        self.filter_label.pack()
 
-    def save_favorites(self):
-        with open("favorites.json", "w") as f:
-            json.dump(self.favorites, f)
-        messagebox.showinfo("Успех", "Избранные пользователи сохранены.")
+        self.filter_entry = tk.Entry(master)
+        self.filter_entry.pack()
 
-    def load_favorites(self):
+        self.filter_button = tk.Button(master, text="Фильтровать", command=self.filter_trainings)
+        self.filter_button.pack(pady=5)
+
+        self.trainings = []
+        self.load_trainings()
+
+    def add_training(self):
+        date_str = self.date_entry.get()
+        training_type = self.type_entry.get()
+        duration_str = self.duration_entry.get()
+
+        # Проверка корректности ввода
         try:
-            with open("favorites.json", "r") as f:
-                self.favorites = json.load(f)
-        except FileNotFoundError:
-            self.favorites = []
+            date = datetime.strptime(date_str, '%Y-%m-%d')
+            duration = int(duration_str)
+            if duration <= 0:
+                raise ValueError("Длительность должна быть положительным числом.")
+        except ValueError as e:
+            messagebox.showerror("Ошибка", f"Некорректный ввод: {e}")
+            return
+
+        training = {
+            "date": date_str,
+            "type": training_type,
+            "duration": duration
+        }
+        self.trainings.append(training)
+        self.update_training_list()
+        self.save_trainings()
+
+    def update_training_list(self):
+        for item in self.trainings_list.get_children():
+            self.trainings_list.delete(item)
+        for training in self.trainings:
+            self.trainings_list.insert("", tk.END, values=(training["date"], training["type"], training["duration"]))
+
+    def filter_trainings(self):
+        training_type_filter = self.filter_entry.get().lower()
+        filtered_trainings = [training for training in self.trainings if training_type_filter in training["type"].lower()]
+        self.trainings_list.delete(*self.trainings_list.get_children())
+        for training in filtered_trainings:
+            self.trainings_list.insert("", tk.END, values=(training["date"], training["type"], training["duration"]))
+
+    def load_trainings(self):
+        if os.path.exists("trainings.json"):
+            with open("trainings.json", "r") as f:
+                self.trainings = json.load(f)
+            self.update_training_list()
+
+    def save_trainings(self):
+        with open("trainings.json", "w") as f:
+            json.dump(self.trainings, f)
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = GitHubUserFinder(root)
+    app = TrainingPlanner(root)
     root.mainloop()
+```
 
+### Шаг 2: Добавление тренировки
 
+Кнопка "Добавить тренировку" вызывает метод `add_training()`, который проверяет вводимые данные и добавляет новую тренировку в список и таблицу.
 
-GitHub User Finder (Поиск пользователей GitHub)
-Описание программы:
-Приложение "GitHub User Finder" позволяет пользователям искать пользователей на GitHub через API GitHub. 
-Данное приложение обеспечивает простую и удобную графическую оболочку для выполнения поиска и добавления пользователей в избранное. 
-Избранные пользователи сохраняются в локальный файл JSON, что позволяет пользователям легко управлять своими предпочтениями.
+### Шаг 3: Фильтрация тренировок
 
-
-
-## Требования
-
-* Python 3.6+
-* Библиотеки: `tkinter`, `requests`, `json`
-
-## Установка и запуск
-
-1. Клонируйте репозиторий:
-```bash
-git clone <URL-репозитория>
-cd GitHub-User-Finder
-
-#### Инструкция по настройке Git
-
-1. Инициализируйте Git‑репозиторий:
-```bash
-git init
-
-Примеры использования
-Пример 1: Поиск пользователя
-
-Введите имя пользователя в поле поиска (например, torvalds).
-
-Нажмите кнопку «Найти».
-
-В списке результатов появится Linus Torvalds и другие похожие пользователи.
-
-Пример 2: Добавление в избранное
-
-Выберите пользователя из списка результатов.
-
-Нажмите «Добавить в избранное».
-
-Пользователь появится в списке избранного.
-
-Пример 3: Просмотр избранного
-
-Нажмите кнопку «Показать избранное».
-
-В списке избранного отобразятся все сохранённые пользователи.
-
-При следующем запуске приложения избранные пользователи сохранятся.
-
-Тесты
-Поиск пустой строки: приложение покажет предупреждение «Поле поиска не может быть пустым».
-
-Поиск существующего пользователя: найдите torvalds, добавьте в избранное, закройте программу, откройте снова — пользователь должен остаться в избранном.
-
-Добавление уже избранного: попытка добавить пользователя дважды вызовет предупреждение «Этот пользователь уже в избранном».
-
-Удаление из избранного: выберите пользователя в списке избранного и нажмите «Удалить из избранного» — пользователь исчезнет из списка.
+Функционал фильтрации реализован в методе `filter_trainings
